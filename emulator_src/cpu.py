@@ -22,7 +22,7 @@ class CPU:
     def to_signed32(self, val): # Обрез до 32 бит
         val &= 0xFFFFFFFF
         if val > 0x7FFFFFFF:
-            val -= 0x10000000
+            val -= 0x100000000
         return val
 
     def fetch(self):
@@ -68,7 +68,7 @@ class CPU:
             return False
         instr = self.fetch()
         opcode, am1, am2, op1, op2 = self.decode(instr)
-
+        self.pc += 1
         if opcode == 0x00: #NOP
             pass
         elif opcode == 0x01: #MOV
@@ -86,7 +86,7 @@ class CPU:
             a = self.get_operand(am1, op1)
             b = self.get_operand(am2, op2)
             res = self.to_signed32(a + b)
-            carry = 1 if (a + b) > 0x7FFFFFF or (a + b) < -0x8000000 else 0
+            carry = 1 if (a + b) > 0x7FFFFFFF or (a + b) < -0x80000000 else 0
             overflow = 1 if (a > 0 and b > 0 and res < 0) or (a < 0 and b < 0 and res > 0) else 0
             self.set_operand(am1, op1, res)
             self.update_flags(res, carry, overflow)
@@ -119,3 +119,105 @@ class CPU:
             res = self.to_signed32(a & b)
             self.set_operand(am1, op1, res)
             self.update_flags(res)
+        elif opcode == 0x09: #OR
+            a = self.get_operand(am1, op1)
+            b = self.get_operand(am2, op2)
+            res = self.to_signed32(a & b)
+            self.set_operand(am1, op1, res)
+        elif opcode == 0x0A: #XOR
+            a = self.get_operand(am1, op1)
+            b = self.get_operand(am2, op2)
+            res = self.to_signed32(a ^ b)
+            self.set_operand(am1, op1, res)
+            self.update_flags(res)
+        elif opcode == 0x0B: #NOT
+            a = self.get_operand(am1, op1)
+            res = self.to_signed32(~a)
+            self.set_operand(am1, op1, res)
+            self.update_flags(res)
+        elif opcode == 0x0C:  # SHL
+            a = self.get_operand(am1, op1)
+            b = self.get_operand(am2, op2)
+            res = self.to_signed32(a << b)
+            self.set_operand(am1, op1, res)
+            self.update_flags(res)
+        elif opcode == 0x0D: #SHR
+            a = self.get_operand(am1, op1)
+            b = self.get_operand(am2, op2)
+            res = self.to_signed32(a >> b)
+            self.set_operand(am1, op1, res)
+            self.update_flags(res)
+        elif opcode == 0x0E: #CMP
+            a = self.get_operand(am1, op1)
+            b = self.get_operand(am2, op2)
+            res = self.to_signed32(a - b)
+            carry = 1 if a < b else 0
+            overflow = 1 if (a > 0 and b < 0 and res < 0) or (a < 0 and b > 0 and res > 0) else 0
+            self.update_flags(res, carry, overflow)
+        elif opcode == 0x0F:  #JMP
+            addr = self.get_address(am1, op1)
+            if am1 == 0:
+                self.pc += addr
+            else:
+                self.pc = addr
+        elif opcode == 0x10:  #JZ
+            if self.flags['Z']:
+                addr = self.get_address(am1, op1)
+                if am1 == 0:
+                    self.pc += addr
+                else:
+                    self.pc = addr
+        elif opcode == 0x11:  #JNZ
+            if self.flags['Z']:
+                addr = self.get_address(am1, op1)
+                if am1 == 0:
+                    self.pc += addr
+                else:
+                    self.pc = addr
+        elif opcode == 0x12:  #JC
+            if self.flags['C']:
+                addr = self.get_address(am1, op1)
+                if am1 == 0:
+                    self.pc += addr
+                else:
+                    self.pc = addr
+        elif opcode == 0x13:  #JNC
+            if self.flags['C']:
+                addr = self.get_address(am1, op1)
+                if am1 == 0:
+                    self.pc += addr
+                else:
+                    self.pc = addr
+        elif opcode == 0x14:  #JS
+            if self.flags['S']:
+                addr = self.get_address(am1, op1)
+                if am1 == 0:
+                    self.pc += addr
+                else:
+                    self.pc = addr
+        elif opcode == 0x15:  #JNS
+            if self.flags['S']:
+                addr = self.get_address(am1, op1)
+                if am1 == 0:
+                    self.pc += addr
+                else:
+                    self.pc = addr
+        elif opcode == 0x16:  #JO
+            if self.flags['O']:
+                addr = self.get_address(am1, op1)
+                if am1 == 0:
+                    self.pc += addr
+                else:
+                    self.pc = addr
+        elif opcode == 0x17:  #JNO
+            if self.flags['O']:
+                addr = self.get_address(am1, op1)
+                if am1 == 0:
+                    self.pc += addr
+                else:
+                    self.pc = addr
+        elif opcode == 0x18:  #HLT
+            self.halted = True
+        else:
+            self.halted = True
+        return True
