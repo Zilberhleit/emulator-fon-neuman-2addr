@@ -30,8 +30,10 @@ class Assembler:
         # Регистр R0..R7
         if op_str in self.regs:
             return (2, self.regs[op_str])
+        if (op_str[0] in 'Rr') and op_str[1:].isdigit():
+            raise ValueError(f"Неизвестный регистр {op_str}")
         # Непосредственное значение #5, #-5
-        if op_str.startwith('#'):
+        if op_str.startswith('#'):
             try:
                 val = int(op_str[1:], 0)
             except ValueError:
@@ -39,7 +41,7 @@ class Assembler:
             val = val & 0x7FF
             return (0, val)
         # Косвенное-регистровая [R3]
-        if op_str.startwith('[') and op_str.endwith(']'):
+        if op_str.startswith('[') and op_str.endswith(']'):
             inner = op_str[1:-1].strip()
             if inner in self.regs:
                 return (3, self.regs[inner])
@@ -79,8 +81,10 @@ class Assembler:
         addr = 0
         for raw in lines:
             line = self._strip_comment(raw)
-            label, rest = self._split_label(line)
             if not line.strip():
+                continue
+            label, rest = self._split_label(line)
+            if label:
                 if label in labels:
                     raise ValueError(f'Метка {label} уже опрделена')
                 labels[label] = addr
