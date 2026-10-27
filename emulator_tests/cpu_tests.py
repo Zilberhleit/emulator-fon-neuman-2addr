@@ -112,5 +112,29 @@ class TestJumps(unittest.TestCase):
         self.assertEqual(self.cpu.pc, 10)
 
 
+class TestLoop(unittest.TestCase):
+    def setUp(self):
+        self.cpu = CPU()
+
+    def test_sum_5(self):
+        for i, v in enumerate([1,2,3,4,5]):
+            self.cpu.memory[100+i] = v
+        self.cpu.registers[0] = 100
+        self.cpu.registers[1] = 5
+        prog = [
+            CMP_ri(1,0),
+            JZ_abs(8),
+            LOAD_ind(3,0),
+            ADD_rr(2,3),
+            ADD_ri(0,1),
+            SUB_ri(1,1),
+            JMP_abs(0),
+            HLT_(),
+            HLT_()
+        ]
+        self.cpu.load_program(prog)
+        run(self.cpu)
+        self.assertEqual(self.cpu.registers[2], 15)
+
 if __name__ == '__main__':
     unittest.main()
