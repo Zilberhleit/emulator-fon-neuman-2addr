@@ -124,3 +124,116 @@ class TestEndToEnd(unittest.TestCase):
         while not cpu.halted:
             cpu.step()
         self.assertEqual(cpu.registers[0], 15)
+
+    def test_sum_10_elements(self):
+        """Тест сценариев из варианта"""
+        text = """
+            MOV R2, #0
+            LOAD R1, [501]
+            MOV R0, #502
+        loop:
+            CMP R1, #0
+            JZ end
+            LOAD R3, [R0]
+            ADD R2, R3
+            ADD R0, #1
+            SUB R1, #1
+            JMP loop
+        end:
+            STORE [600], R2
+            HLT
+        """
+        prog = Assembler().assemble(text)
+        cpu = CPU()
+        cpu.load_program(prog)
+
+        cpu.memory[500] = 1
+        cpu.memory[501] = 10
+        for i in range(10):
+            cpu.memory[502 + i] = (i + 1) * 3
+
+        while not cpu.halted:
+            cpu.step()
+
+        self.assertEqual(cpu.memory[600], 165)
+
+    def test_sum_single_element(self):
+        text = """
+            MOV R2, #0
+            LOAD R1, [501]
+            MOV R0, #502
+        loop:
+            CMP R1, #0
+            JZ end
+            LOAD R3, [R0]
+            ADD R2, R3
+            ADD R0, #1
+            SUB R1, #1
+            JMP loop
+        end:
+            STORE [600], R2
+            HLT
+        """
+        prog = Assembler().assemble(text)
+        cpu = CPU()
+        cpu.load_program(prog)
+        cpu.memory[500] = 1
+        cpu.memory[501] = 1
+        cpu.memory[502] = 42
+
+        while not cpu.halted:
+            cpu.step()
+        self.assertEqual(cpu.memory[600], 42)
+
+    def _run_convolution(self, arr_a, arr_b):
+        text = """
+            MOV R2, #0
+            MOV R6, #701
+            MOV R7, #721
+            MOV R4, #10
+        loop:
+            CMP R4, #0
+            JZ end
+            LOAD R0, [R6]
+            LOAD R1, [R7]
+            MUL R0, R1
+            ADD R2, R0
+            ADD R6, #1
+            ADD R7, #1
+            SUB R4, #1
+            JMP loop
+        end:
+            STORE [800], R2
+            HLT
+        """
+        prog = Assembler().assemble(text)
+        cpu = CPU()
+        cpu.load_program(prog)
+
+        cpu.memory[700] = 1
+
+        for i, v in enumerate(arr_a):
+            cpu.memory[701 + i] = v
+        cpu.memory[720] = 2
+        for i, v in enumerate(arr_b):
+            cpu.memory[721 + i] = v
+
+        while not cpu.halted:
+            cpu.step()
+        return cpu.memory[800]
+
+    def test_positive_arrays(self):
+        arr_a = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        arr_b = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
+        self.assertEqual(self._run_convolution(arr_a, arr_b), 770)
+
+    def test_zeros_arrays(self):
+        a = [0] * 10
+        b = [0] * 10
+        self.assertEqual(self._run_convolution(a,b), 0)
+
+    def test_negative_arrays(self):
+        arr_a = [-1, -2, -3, -4, -5, -6, -7, -8, -9, -10]
+        arr_b = [-2, -4, -6, -8, -10, -12, -14, -16, -18, -20]
+        self.assertEqual(self._run_convolution(arr_a,arr_b), 770)
+
