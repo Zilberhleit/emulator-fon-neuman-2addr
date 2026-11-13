@@ -52,6 +52,38 @@ end:
     HLT
 """
 
+EXAMPLE3_TEXT = """
+    MOV R2, #0          ; S_low = 0
+    MOV R5, #0          ; S_high = 0
+    MOV R6, #701        ; указатель A
+    MOV R7, #721        ; указатель B
+    MOV R4, #10         ; счётчик
+
+loop:
+    CMP R4, #0
+    JZ  end
+
+    LOAD R0, [R6]       ; R0 = A[i]
+    LOAD R1, [R7]       ; R1 = B[i]
+
+    MOV  R3, R0         ; копия A[i] для MULL
+    MULL R3, R1         ; R3 = low(A[i] * B[i])
+    MULH R0, R1         ; R0 = high(A[i] * B[i])
+
+    ADD  R2, R3         ; low += low => C = 1, если перенос
+    ADCL R5, R0         ; high += high + C
+
+    ADD R6, #1
+    ADD R7, #1
+    SUB R4, #1
+    JMP loop
+
+end:
+    STORE [800], R2     ; младшие 32 бита
+    STORE [801], R5     ; старшие 32 бита
+    HLT
+"""
+
 OPCODE_TO_NAME = {
     0x00: 'NOP',  0x01: 'MOV',  0x02: 'LOAD', 0x03: 'STORE',
     0x04: 'ADD',  0x05: 'SUB',  0x06: 'MUL',  0x07: 'DIV',
@@ -59,7 +91,8 @@ OPCODE_TO_NAME = {
     0x0C: 'SHL',  0x0D: 'SHR',  0x0E: 'CMP',  0x0F: 'JMP',
     0x10: 'JZ',   0x11: 'JNZ',  0x12: 'JC',   0x13: 'JNC',
     0x14: 'JS',   0x15: 'JNS',  0x16: 'JO',   0x17: 'JNO',
-    0x18: 'HLT',
+    0x18: 'HLT', 0x19: 'MULL', 0x1A: 'MULH', 0x1B: 'ADCL', 0x1C: 'SBBC',
+     0x1D: 'SETB',  0x1E: 'LOADB', 0x1F: 'STOREB'
 }
 
 
@@ -97,6 +130,7 @@ class EmulatorApp:
         ex_row.pack(fill=tk.X, pady=(0,5))
         tk.Button(btn_row, text="Пример 1: сумма массива", width=12, command=self.on_example1).pack(side=tk.LEFT, padx=2)
         tk.Button(btn_row, text="Пример 2: свёртка массивов", width=12, command=self.on_example2).pack(side=tk.LEFT, padx=2)
+        tk.Button(btn_row, text="Пример 3: свёртка массивов дл. алг.", width=12, command=self.on_example3).pack(side=tk.LEFT, padx=2)
 
         self.status_var = tk.StringVar(value="Готово к работе")
         tk.Label(left, textvariable=self.status_var, fg='darkblue', anchor='w', justify='left').pack(fill=tk.X)
@@ -219,6 +253,18 @@ class EmulatorApp:
         except ValueError as e:
             messagebox.showerror("Ошибка загрузки примера 2", str(e))
         self.update_display()
+
+    def on_example3(self):
+        self.code_editor.delete('1.0', tk.END)
+        self.code_editor.insert('1.0', EXAMPLE3_TEXT)
+        for i in range(10):
+            self.cpu.memory[701 + i] = 100000
+            self.cpu.memory[721 + i] = 100000
+        try:
+            program = self.assembler.assemble(EXAMPLE3_TEXT)
+            self.cpu.load_program(program)
+        except ValueError as e:
+            messagebox.showerror("Ошибка загрузки примера 3", str(e))
 
     def update_display(self):
         for i in range(8):

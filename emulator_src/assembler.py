@@ -7,7 +7,8 @@ class Assembler:
             'SHL': 0x0C, 'SHR': 0x0D, 'CMP': 0x0E, 'JMP': 0x0F,
             'JZ': 0x10, 'JNZ': 0x11, 'JC': 0x12, 'JNC': 0x13,
             'JS': 0x14, 'JNS': 0x15, 'JO': 0x16, 'JNO': 0x17,
-            'HLT': 0x18
+            'HLT': 0x18, 'MULL': 0x19, 'MULH': 0x1A, 'ADCL': 0x1B, 'SBBC': 0x1C,
+            'SETB': 0x1D, 'LOADB': 0x1E, 'STOREB': 0x1F
         }
         self.regs = {f'R{i}': i for i in range(8)}
 
@@ -38,6 +39,11 @@ class Assembler:
                 val = int(op_str[1:], 0)
             except ValueError:
                 raise ValueError(f'Некорректное непосредственное значение, {op_str}')
+
+            if not (-1024 <= val <= 1023):
+                raise ValueError(
+                    f'Непосредственное значение {val} не помещается в 11-битное поле, используйте память для больших чисел '
+                )
             val = val & 0x7FF
             return (0, val)
         # Косвенное-регистровая [R3]

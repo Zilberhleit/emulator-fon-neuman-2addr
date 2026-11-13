@@ -4,6 +4,7 @@ class CPU:
         self.registers = [0] * 8
         self.pc = 0 # счётчик команд
         self.ir = 0 # регистр команд
+        self.br = 0 # регистр базы
         self.flags = {'Z':0, 'C':0, 'S':0, 'O':0}
         self.halted = False # остановка
 
@@ -12,6 +13,7 @@ class CPU:
         self.registers = [0] * 8
         self.pc = 0 # счётчик команд
         self.ir = 0 # регистр команд
+        self.br = 0
         self.flags = {'Z':0, 'C':0, 'S':0, 'O':0} #Zero, Carry, Sign, Overflow
         self.halted = False # остановка
 
@@ -67,9 +69,11 @@ class CPU:
         self.flags['O'] = overflow
 
     def step(self):
-        if self.halted or self.fetch() == None:
+        if self.halted:
             return False
         instr = self.fetch()
+        if instr is None:
+            return False
         opcode, am1, am2, op1, op2 = self.decode(instr)
         self.pc += 1
         if opcode == 0x00: #NOP
@@ -89,7 +93,9 @@ class CPU:
             a = self.get_operand(am1, op1)
             b = self.get_operand(am2, op2)
             res = self.to_signed32(a + b)
-            carry = 1 if (a + b) > 0x7FFFFFFF or (a + b) < -0x80000000 else 0
+            ua = a & 0xFFFFFFFF
+            ub = b & 0xFFFFFFFF
+            carry = 1 if (ua + ub) > 0xFFFFFFFF else 0
             overflow = 1 if (a > 0 and b > 0 and res < 0) or (a < 0 and b < 0 and res > 0) else 0
             self.set_operand(am1, op1, res)
             self.update_flags(res, carry, overflow)
@@ -97,16 +103,20 @@ class CPU:
             a = self.get_operand(am1, op1)
             b = self.get_operand(am2, op2)
             res = self.to_signed32(a - b)
-            carry = 1 if (a - b) < -0x8000000 else 0
-            overflow = 1 if (a > 0 and b < 0 and res < 0) or (a > 0 and b < 0 and res > 0) else 0
+            ua = a & 0xFFFFFFFF
+            ub = b & 0xFFFFFFFF
+            carry = 1 if ua < ub else 0
+            overflow = 1 if (a > 0 and b < 0 and res < 0) or (a < 0 and b > 0 and res > 0) else 0
             self.set_operand(am1, op1, res)
             self.update_flags(res, carry, overflow)
         elif opcode == 0x06: #MUL
             a = self.get_operand(am1, op1)
             b = self.get_operand(am2, op2)
+            raw = a * b
             res = self.to_signed32(a * b)
+            overflow = 1 if not (-2 ** 31 <= raw <= 2 ** 31 - 1) else 0
             self.set_operand(am1, op1, res)
-            self.update_flags(res)
+            self.update_flags(res, carry=0, overflow=overflow)
         elif opcode == 0x07: #DIV
             a = self.get_operand(am1, op1)
             b = self.get_operand(am2, op2)
@@ -154,7 +164,9 @@ class CPU:
             a = self.get_operand(am1, op1)
             b = self.get_operand(am2, op2)
             res = self.to_signed32(a - b)
-            carry = 1 if a < b else 0
+            ua = a & 0xFFFFFFFF
+            ub = b & 0xFFFFFFFF
+            carry = 1 if ua < ub else 0
             overflow = 1 if (a > 0 and b < 0 and res < 0) or (a < 0 and b > 0 and res > 0) else 0
             self.update_flags(res, carry, overflow)
         elif opcode == 0x0F:  #JMP
@@ -221,6 +233,67 @@ class CPU:
                     self.pc = addr
         elif opcode == 0x18:  #HLT
             self.halted = True
+        elif opcode == 0x19: #MULL
+            a = self.get_operand(am1, op1)
+            b = self.get_operand(am2, op2)
+            res = self.to_signed32((a * b) & 0xFFFFFFFF)
+            self.set_operand(am1, op1, res)
+            self.update_flags(res)
+        elif opcode == 0x1A: #MULH
+            a = self.get_operand(am1, op1)
+            b = self.get_operand(am2, op2)
+            res = self.to_signed32(((a * b) >> 32) & 0xFFFFFFFF)
+            self.set_operand(am1, op1, res)
+            self.update_flags(res)
+        elif opcode == 0x1B: #ADCL
+            a = self.get_operand(am1, op1)
+            b = self.get_operand(am2, op2)
+            c_in = self.flags['C']
+            raw = a + b + c_in
+            res = self.to_signed32(raw)
+            ua = a & 0xFFFFFFFF
+            ub = b & 0xFFFFFFFF
+            carry_out = 1 if (ua + ub + c_in) > 0xFFFFFFFF else 0
+            overflow = 1 if not (-2 ** 31 <= raw <= 2 ** 31 - 1) else 0
+            self.set_operand(am1, op1, res)
+            self.update_flags(res, carry_out, overflow)
+        elif opcode == 0x1C: #SBBC
+            a = self.get_operand(am1, op1)
+            b = self.get_operand(am2, op2)
+            c_in = self.flags['C']
+            raw = a - b - c_in
+            res = self.to_signed32(raw)
+            ua = a & 0xFFFFFFFF
+            ub = b & 0xFFFFFFFF
+            carry_out = 1 if ua < ub + c_in else 0
+            overflow = 1 if not (-2 ** 31 <= raw <= 2 ** 31 - 1) else 0
+            self.set_operand(am1, op1, res)
+            self.update_flags(res, carry_out, overflow)
+        elif opcode == 0x1D: #SETB
+            val = self.get_operand(am1, op1)
+            self.br = val & 0xFFFFFFFF
+        elif opcode == 0x1E: #LOADB
+            offset = self.get_operand(am2, op2)
+            if am1 == 2:
+                addr = (self.br + offset) & 0x7FF
+                if addr < 0 or addr >= len(self.memory):
+                    self.halted = True
+                    return False
+                self.registers[op1] = self.memory[addr]
+            else:
+                self.halted = True
+                return False
+        elif opcode == 0x1F: #STOREB
+            offset = self.get_operand(am1, op1)
+            if am2 == 2:
+                addr = (self.br + offset) & 0x7FF
+                if addr < 0 or addr >= len(self.memory):
+                    self.halted = True
+                    return False
+                self.memory[addr] = self.to_signed32(self.registers[op2])
+            else:
+                self.halted = True
+                return False
         else:
             self.halted = True
         return True
