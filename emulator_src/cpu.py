@@ -62,6 +62,18 @@ class CPU:
         elif am == 3: return self.registers[op]
         return op
 
+    def _read_mem(self, addr):
+        if not (0 <= addr < len(self.memory)):
+            self.halted = True
+            raise ValueError(f"Чтение за границей памяти {addr}")
+        return self.memory[addr]
+
+    def _write_mem(self, addr, val):
+        if not (0 <= addr < len(self.memory)):
+            self.halted = True
+            raise ValueError(f"Запись за границей памяти {addr}")
+        self.memory[addr] = self.to_signed32(val)
+
     def update_flags(self, result, carry=0, overflow=0):
         self.flags['Z'] = 1 if result == 0 else 0
         self.flags['S'] = 1 if result < 0 else 0
