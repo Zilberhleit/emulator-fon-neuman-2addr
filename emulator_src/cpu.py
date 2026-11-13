@@ -26,6 +26,9 @@ class CPU:
         return val
 
     def fetch(self):
+        if self.pc < 0 or self.pc >= len(self.memory):
+            self.halted = True
+            return None
         self.ir = self.memory[self.pc]
         return self.ir
 
@@ -64,7 +67,7 @@ class CPU:
         self.flags['O'] = overflow
 
     def step(self):
-        if self.halted:
+        if self.halted or self.fetch() == None:
             return False
         instr = self.fetch()
         opcode, am1, am2, op1, op2 = self.decode(instr)
@@ -168,7 +171,7 @@ class CPU:
                 else:
                     self.pc = addr
         elif opcode == 0x11:  #JNZ
-            if self.flags['Z']:
+            if not self.flags['Z']:
                 addr = self.get_address(am1, op1)
                 if am1 == 0:
                     self.pc += addr
@@ -182,7 +185,7 @@ class CPU:
                 else:
                     self.pc = addr
         elif opcode == 0x13:  #JNC
-            if self.flags['C']:
+            if not self.flags['C']:
                 addr = self.get_address(am1, op1)
                 if am1 == 0:
                     self.pc += addr
@@ -196,7 +199,7 @@ class CPU:
                 else:
                     self.pc = addr
         elif opcode == 0x15:  #JNS
-            if self.flags['S']:
+            if not self.flags['S']:
                 addr = self.get_address(am1, op1)
                 if am1 == 0:
                     self.pc += addr
@@ -210,7 +213,7 @@ class CPU:
                 else:
                     self.pc = addr
         elif opcode == 0x17:  #JNO
-            if self.flags['O']:
+            if not self.flags['O']:
                 addr = self.get_address(am1, op1)
                 if am1 == 0:
                     self.pc += addr
